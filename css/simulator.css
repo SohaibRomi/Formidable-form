@@ -1,0 +1,5 @@
+.simulator-canvas-wrapper{width:100%;}
+.simulator-canvas{position:relative;overflow:hidden;}
+.simulator-canvas img{display:block;}
+.simulator-canvas img.simulator-bg{position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;}
+.simulator-canvas img.simulator-layer-img{position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;}
