@@ -74,6 +74,10 @@ function frm_sim_set_defaults($field_data) {
         $field_data['name'] = __('Simulator Layer', 'frm-sim');
         $defaults = array(
             'layer_image' => '',
+            // Optional: control visibility by a radio (field ID or key)
+            'control_field' => '',
+            // One or more values (comma-separated) that should display this layer
+            'control_value' => '',
         );
         $field_data['field_options'] = array_merge($field_data['field_options'] ?? [], $defaults);
     }
@@ -121,6 +125,20 @@ function frm_sim_add_options_ui($field, $display, $values) {
                 <button type="button" class="button frm_sim_upload_button" data-field-id="<?php echo esc_attr($field['id']); ?>" data-upload-type="layer"><?php _e('Upload Transparent Image', 'frm-sim'); ?></button>
             </td>
         </tr>
+        <tr>
+            <td><label><?php _e('Control Field (ID or Key)', 'frm-sim'); ?></label></td>
+            <td>
+                <input type="text" name="field_options[control_field_<?php echo esc_attr($field['id']); ?>]" value="<?php echo esc_attr($field_options['control_field'] ?? ''); ?>" placeholder="e.g., 123 or field_key" />
+                <p class="description"><?php _e('Optional: Radio field that controls this layer visibility.', 'frm-sim'); ?></p>
+            </td>
+        </tr>
+        <tr>
+            <td><label><?php _e('Show When Value(s)', 'frm-sim'); ?></label></td>
+            <td>
+                <input type="text" name="field_options[control_value_<?php echo esc_attr($field['id']); ?>]" value="<?php echo esc_attr($field_options['control_value'] ?? ''); ?>" placeholder="e.g., red,blue" />
+                <p class="description"><?php _e('Comma-separated list of radio values that should show this layer.', 'frm-sim'); ?></p>
+            </td>
+        </tr>
         <?php
     }
 }
@@ -134,6 +152,8 @@ function frm_sim_update_options($field_options, $field, $values) {
         $field_options['height'] = isset($values['field_options']['height_' . $field->id]) ? sanitize_text_field($values['field_options']['height_' . $field->id]) : '400';
     } elseif ($field->type == 'simulator_layer') {
         $field_options['layer_image'] = isset($values['field_options']['layer_image_' . $field->id]) ? intval($values['field_options']['layer_image_' . $field->id]) : '';
+        $field_options['control_field'] = isset($values['field_options']['control_field_' . $field->id]) ? sanitize_text_field($values['field_options']['control_field_' . $field->id]) : '';
+        $field_options['control_value'] = isset($values['field_options']['control_value_' . $field->id]) ? sanitize_text_field($values['field_options']['control_value_' . $field->id]) : '';
     }
     return $field_options;
 }
@@ -186,7 +206,7 @@ function frm_sim_render_canvas($field, $field_name, $atts) {
     $aspect = ($height / $width) * 100;
     ?>
     <div class="simulator-canvas-wrapper" style="max-width: <?php echo esc_attr($width); ?>px; width: 100%;">
-        <div id="<?php echo esc_attr($html_id); ?>" class="simulator-canvas" style="position: relative; padding-bottom: <?php echo esc_attr($aspect); ?>%;">
+        <div id="<?php echo esc_attr($html_id); ?>" class="simulator-canvas" data-canvas-field-id="<?php echo esc_attr($field['id']); ?>" style="position: relative; padding-bottom: <?php echo esc_attr($aspect); ?>%;">
             <img src="<?php echo esc_attr($bg_url); ?>" alt="Background" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover;">
         </div>
     </div>
@@ -214,8 +234,18 @@ function frm_sim_render_layer($field, $field_name, $atts) {
         error_log('Formidable Simulator: No layer image set for field ID ' . $field['id']);
         return;
     }
+    // Resolve control field to ID if provided (may be ID or key)
+    $control_field_raw = isset($field_options['control_field']) ? $field_options['control_field'] : '';
+    $control_value = isset($field_options['control_value']) ? $field_options['control_value'] : '';
+    $control_field_id = '';
+    if (!empty($control_field_raw)) {
+        $maybe_field = is_numeric($control_field_raw) ? FrmField::getOne((int) $control_field_raw) : FrmField::getOne($control_field_raw);
+        if ($maybe_field && ! is_wp_error($maybe_field)) {
+            $control_field_id = $maybe_field->id;
+        }
+    }
     ?>
-    <img class="simulator-layer-img" src="<?php echo esc_attr($layer_url); ?>" alt="Layer" data-layer-id="<?php echo esc_attr($html_id); ?>">
+    <img class="simulator-layer-img" src="<?php echo esc_attr($layer_url); ?>" alt="Layer" data-layer-id="<?php echo esc_attr($html_id); ?>" <?php if ($control_field_id) : ?>data-control-field-id="<?php echo esc_attr($control_field_id); ?>"<?php endif; ?> <?php if ($control_value !== '') : ?>data-control-values="<?php echo esc_attr($control_value); ?>"<?php endif; ?>>
     <?php
 }
 
@@ -272,9 +302,7 @@ function frm_sim_display_merged($value, $field, $atts) {
 // Enqueue assets
 add_action('wp_enqueue_scripts', 'frm_sim_enqueue_frontend');
 function frm_sim_enqueue_frontend() {
-    if (!function_exists('FrmAppHelper')) {
-        return;
-    }
+    // Enqueue on pages with forms; if needed this can be tightened later
     wp_enqueue_script('frm-sim-js', FRM_SIM_URL . 'js/simulator.js', array('jquery'), '1.6', true);
     wp_enqueue_style('frm-sim-css', FRM_SIM_URL . 'css/simulator.css', array(), '1.6');
 }

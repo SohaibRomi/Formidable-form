@@ -1,0 +1,22 @@
+/* Canvas wrapper keeps aspect ratio via padding-bottom on inner canvas */
+.simulator-canvas-wrapper {
+  width: 100%;
+}
+
+.simulator-canvas {
+  position: relative;
+}
+
+.simulator-canvas img {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.simulator-canvas img.simulator-layer-img {
+  /* layers start hidden; shown by radio logic */
+  display: none;
+}
